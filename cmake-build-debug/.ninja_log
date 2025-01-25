@@ -1,0 +1,12 @@
+# ninja log v6
+1	504	7595235231684153	CMakeFiles/Intrusion_Detection_System_IDS.dir/src/main.cpp.obj	b48e9a79d7cff63f
+12	604	7595235231802383	CMakeFiles/Intrusion_Detection_System_IDS.dir/src/DeviceManager.cpp.obj	c4ad296511c3f0dd
+8	605	7595235231756057	CMakeFiles/Intrusion_Detection_System_IDS.dir/src/PacketHandler.cpp.obj	e12dbc58f5293a44
+605	1051	7595235237723589	Intrusion_Detection_System_IDS.exe	60f3cee1f7fae6e8
+13	130	7595237332907279	build.ninja	571fc4efd58cd5b
+10	421	7595237333561555	CMakeFiles/Intrusion_Detection_System_IDS.dir/src/main.cpp.obj	b48e9a79d7cff63f
+17	530	7595237333624400	CMakeFiles/Intrusion_Detection_System_IDS.dir/src/PacketHandler.cpp.obj	e12dbc58f5293a44
+20	539	7595237333662285	CMakeFiles/Intrusion_Detection_System_IDS.dir/src/DeviceManager.cpp.obj	c4ad296511c3f0dd
+540	679	7595237338849285	Intrusion_Detection_System_IDS.exe	60f3cee1f7fae6e8
+1	516	7595238060369801	CMakeFiles/Intrusion_Detection_System_IDS.dir/src/PacketHandler.cpp.obj	e12dbc58f5293a44
+516	644	7595238065529207	Intrusion_Detection_System_IDS.exe	60f3cee1f7fae6e8

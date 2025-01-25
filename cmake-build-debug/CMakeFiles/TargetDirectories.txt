@@ -1,0 +1,3 @@
+D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug/CMakeFiles/Intrusion_Detection_System_IDS.dir
+D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug/CMakeFiles/edit_cache.dir
+D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug/CMakeFiles/rebuild_cache.dir
