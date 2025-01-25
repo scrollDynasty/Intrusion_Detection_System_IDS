@@ -45,7 +45,7 @@ The system is implemented in **C++** and uses **Npcap** for packet capturing. It
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/Intrusion_Detection_System_IDS.git
+   git clone https://github.com/scrollDynasty/Intrusion_Detection_System_IDS.git
    cd Intrusion_Detection_System_IDS
    ```
 
