@@ -15,12 +15,16 @@ public:
     explicit PacketHandler(QObject *parent = nullptr);
     ~PacketHandler();
 
-    bool startCapture(const std::string& deviceName);
+    bool startCapture(const std::string& deviceName, QString* errorMessage = nullptr);
     void stopCapture();
     int getPacketCount() const { return packetCount; }
+    
+    void incrementPacketCount() { packetCount++; }
 
 signals:
-    void packetDetected(const QString& sourceIP, const QString& destinationIP, const QString& packetType, const QString& timestamp);
+    void packetDetected(const QString& sourceIP, const QString& destinationIP, 
+                       const QString& packetType, const QString& timestamp,
+                       bool isPotentialThreat = false);
 
 private:
     static void processPacket(u_char* userData, const struct pcap_pkthdr* pkthdr, const u_char* packet);

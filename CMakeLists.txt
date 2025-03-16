@@ -31,44 +31,47 @@ endforeach()
 find_package(Qt6 COMPONENTS Widgets Core REQUIRED)
 
 set(SOURCES
-        src/main.cpp
-        src/PacketHandler.cpp
-        src/DeviceManager.cpp
-        src/MainWindow.cpp
-        src/SuspiciousIPModel.cpp
+    src/main.cpp
+    src/PacketHandler.cpp
+    src/DeviceManager.cpp
+    src/MainWindow.cpp
+    src/SuspiciousIPModel.cpp
 )
 
 set(HEADERS
-        include/PacketHandler.h
-        include/DeviceManager.h
-        include/MainWindow.h
-        include/SuspiciousIPModel.h
+    include/PacketHandler.h
+    include/DeviceManager.h
+    include/MainWindow.h
+    include/SuspiciousIPModel.h
+    include/ip_hdr.h
+    include/tcp_hdr.h
 )
 
 set(UI_FILES
-        src/MainWindow.ui
+    src/MainWindow.ui
 )
 
 # Добавляем файл ресурсов
 set(RESOURCES
-        resources.qrc
+    resources.qrc
 )
 
 include_directories(
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/npcap/Include
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/npcap/Include
 )
 
 link_directories(${CMAKE_SOURCE_DIR}/npcap/Lib/x64)
 
+# Создаем обычный исполняемый файл без запроса прав администратора
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES} ${RESOURCES})
 
 target_link_libraries(${PROJECT_NAME}
-        Packet
-        wpcap
-        ws2_32.lib
-        Qt6::Widgets
-        Qt6::Core
+    Packet
+    wpcap
+    ws2_32.lib
+    Qt6::Widgets
+    Qt6::Core
 )
 
 # Копируем необходимые DLL-файлы в директорию сборки

@@ -10,10 +10,16 @@
 #include <QCommandLineOption>
 #include <QFile>
 #include <QTextStream>
+#include <QDebug>
+#include <QDateTime>
+#include <QMutex>
 #include "MainWindow.h"
 #include "PacketHandler.h"
 
 #pragma comment(lib, "Ws2_32.lib")
+
+// Глобальный мьютекс для синхронизации доступа к файлу лога
+QMutex logMutex;
 
 // Функция для загрузки и применения стилей
 void applyStyles(QApplication& app) {
@@ -27,9 +33,59 @@ void applyStyles(QApplication& app) {
     }
 }
 
+// Обработчик сообщений для перенаправления вывода в файл лога
+void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    // Блокируем мьютекс для безопасного доступа к файлу
+    QMutexLocker locker(&logMutex);
+    
+    // Открываем файл для каждого сообщения
+    QFile logFile("ids_log.txt");
+    if (!logFile.open(QIODevice::Append | QIODevice::Text)) {
+        // Если не удалось открыть файл, выводим сообщение в стандартный вывод
+        fprintf(stderr, "Не удалось открыть файл лога\n");
+        return;
+    }
+    
+    QTextStream out(&logFile);
+    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
+    
+    switch (type) {
+        case QtDebugMsg:
+            out << timestamp << " [DEBUG] " << msg << "\n";
+            break;
+        case QtInfoMsg:
+            out << timestamp << " [INFO] " << msg << "\n";
+            break;
+        case QtWarningMsg:
+            out << timestamp << " [WARNING] " << msg << "\n";
+            break;
+        case QtCriticalMsg:
+            out << timestamp << " [CRITICAL] " << msg << "\n";
+            break;
+        case QtFatalMsg:
+            out << timestamp << " [FATAL] " << msg << "\n";
+            // Не вызываем abort() здесь, чтобы не завершать программу аварийно
+            break;
+    }
+    
+    // Сбрасываем буфер и закрываем файл
+    out.flush();
+    logFile.close();
+    
+    // Дублируем вывод в консоль
+    fprintf(stderr, "%s\n", qPrintable(msg));
+}
+
 int main(int argc, char *argv[]) {
+    // Устанавливаем обработчик сообщений для перенаправления вывода в файл
+    qInstallMessageHandler(messageHandler);
+    
+    // Инициализируем кодировку для консоли
+    #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
+    #endif
 
     QApplication app(argc, argv);
     

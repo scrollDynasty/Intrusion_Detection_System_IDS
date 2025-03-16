@@ -1,81 +1,63 @@
 #include "DeviceManager.h"
 #include <iostream>
 #include <pcap.h>
-#include <QStringList>
+#include <QDebug>
 
-std::string DeviceManager::chooseDevice() {
-    char errorBuffer[PCAP_ERRBUF_SIZE];
-    pcap_if_t* allDevices;
-    if (pcap_findalldevs(&allDevices, errorBuffer) == -1) {
-        std::cerr << "Error: " << errorBuffer << std::endl;
-        return "";
-    }
-
-    std::cout << "Available devices:" << std::endl;
-    int deviceCount = 0;
-    for (pcap_if_t* device = allDevices; device != nullptr; device = device->next) {
-        std::cout << ++deviceCount << ". " << device->name;
-        if (device->description) {
-            std::cout << " (" << device->description << ")";
-        }
-        std::cout << std::endl;
-    }
-
-    if (deviceCount == 0) {
-        std::cerr << "No devices available!" << std::endl;
-        return "";
-    }
-
-    std::cout << "Enter device number: ";
-    int choice;
-    std::cin >> choice;
-
-    pcap_if_t* selectedDevice = allDevices;
-    for (int i = 1; i < choice; ++i) {
-        selectedDevice = selectedDevice->next;
-    }
-
-    std::string deviceName = selectedDevice->name;
-    pcap_freealldevs(allDevices);
-
-    return deviceName;
+DeviceManager::DeviceManager(QObject *parent) : QObject(parent) {
+    // Инициализация
 }
 
-QStringList DeviceManager::getDeviceList() {
-    QStringList deviceList;
+DeviceManager::~DeviceManager() {
+    // Освобождение ресурсов
+}
+
+std::vector<std::string> DeviceManager::getDeviceList() {
+    std::vector<std::string> deviceList;
+    pcap_if_t *alldevs;
+    char errbuf[PCAP_ERRBUF_SIZE];
     
-    // Очищаем карту имен устройств
-    deviceNamesMap.clear();
-    
-    char errorBuffer[PCAP_ERRBUF_SIZE];
-    pcap_if_t* allDevices;
-    if (pcap_findalldevs(&allDevices, errorBuffer) == -1) {
-        std::cerr << "Error: " << errorBuffer << std::endl;
+    // Получаем список всех устройств
+    if (pcap_findalldevs(&alldevs, errbuf) == -1) {
+        qDebug() << "Ошибка при получении списка устройств:" << errbuf;
         return deviceList;
     }
     
-    int index = 0;
-    for (pcap_if_t* device = allDevices; device != nullptr; device = device->next) {
-        // Сохраняем имя устройства в карту
-        deviceNamesMap[index] = device->name;
+    // Добавляем тестовый адаптер
+    deviceList.push_back("test0 (Тестовый режим)");
+    deviceNamesMap[0] = "test0";
+    
+    int i = 1; // Начинаем с 1, так как 0 - тестовый адаптер
+    for (pcap_if_t *d = alldevs; d != nullptr; d = d->next) {
+        std::string name = d->name;
+        std::string description = (d->description) ? d->description : "Нет описания";
         
-        // Создаем строку для отображения в UI
-        QString displayName = device->name;
-        if (device->description) {
-            displayName += " (" + QString(device->description) + ")";
+        // Определяем тип адаптера (Wi-Fi, Ethernet и т.д.)
+        std::string adapterType = "Неизвестно";
+        if (description.find("Wi-Fi") != std::string::npos || 
+            description.find("Wireless") != std::string::npos ||
+            description.find("802.11") != std::string::npos) {
+            adapterType = "Wi-Fi";
+        } else if (description.find("Ethernet") != std::string::npos ||
+                  description.find("LAN") != std::string::npos) {
+            adapterType = "Ethernet";
         }
-        deviceList.append(displayName);
         
-        index++;
+        // Формируем удобное имя для отображения
+        std::string displayName = name + " (" + adapterType + ": " + description + ")";
+        
+        deviceList.push_back(displayName);
+        deviceNamesMap[i] = name;
+        i++;
     }
     
-    pcap_freealldevs(allDevices);
+    // Освобождаем список устройств
+    pcap_freealldevs(alldevs);
     
     return deviceList;
 }
 
-std::string DeviceManager::getDeviceNameByIndex(int index) const {
-    if (deviceNamesMap.contains(index)) {
+std::string DeviceManager::getDeviceNameByIndex(int index) {
+    if (deviceNamesMap.find(index) != deviceNamesMap.end()) {
         return deviceNamesMap[index];
     }
     return "";

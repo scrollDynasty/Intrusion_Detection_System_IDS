@@ -2,20 +2,23 @@
 #define DEVICE_MANAGER_H
 
 #include <string>
-#include <QStringList>
-#include <QMap>
+#include <vector>
+#include <map>
+#include <QObject>
 
-class DeviceManager {
+class DeviceManager : public QObject {
+    Q_OBJECT
+
 public:
-    std::string chooseDevice();
-    QStringList getDeviceList();
-    
-    // Новый метод для получения имени устройства по индексу
-    std::string getDeviceNameByIndex(int index) const;
-    
+    explicit DeviceManager(QObject *parent = nullptr);
+    ~DeviceManager();
+
+    std::vector<std::string> getDeviceList();
+    std::string getDeviceNameByIndex(int index);
+
 private:
-    // Карта для хранения имен устройств (ключ - индекс, значение - имя устройства)
-    QMap<int, std::string> deviceNamesMap;
+    std::vector<std::string> deviceList;
+    std::map<int, std::string> deviceNamesMap;
 };
 
 #endif // DEVICE_MANAGER_H
