@@ -6,6 +6,7 @@ debug/
 release/
 x64/
 Win32/
+.venv
 
 # Файлы Qt
 *.pro.user
