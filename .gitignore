@@ -1,11 +1,11 @@
 # Директории сборки
-/build/
-/cmake-build-*/
-/out/
-/debug/
-/release/
-/x64/
-/Win32/
+build/
+cmake-build-*/
+out/
+debug/
+release/
+x64/
+Win32/
 
 # Файлы Qt
 *.pro.user
