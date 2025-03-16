@@ -1,0 +1,38 @@
+# Игнорировать директорию сборки
+cmake-build-debug/
+build/
+
+# Игнорировать файлы Git
+.git/
+.gitignore
+
+# Игнорировать файлы Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Игнорировать скрипты запуска Docker
+run_docker.sh
+run_docker.bat
+run_docker_mac.sh
+
+# Игнорировать временные файлы
+*.tmp
+*.log
+*.swp
+*~
+
+# Игнорировать файлы IDE
+.idea/
+.vscode/
+*.user
+*.pro.user
+*.autosave
+
+# Игнорировать скомпилированные файлы
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib 

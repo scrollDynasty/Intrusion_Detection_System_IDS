@@ -1,5 +1,5 @@
-ToolSet: 17.0 (local)@C:\Program Files\Microsoft Visual Studio\2022\Community
-Ninja: 1.12.1@D:\jetCli\CLion 2024.3.2\bin\ninja\win\x64\ninja.exe
+ToolSet: 11.0 w64 (local)@D:\Clion\CLion 2024.3.4\bin\mingw
+Ninja: 1.12.1@D:\Clion\CLion 2024.3.4\bin\ninja\win\x64\ninja.exe
 Options: 
 
-Options:-DCMAKE_MAKE_PROGRAM=D:/jetCli/CLion 2024.3.2/bin/ninja/win/x64/ninja.exe
+Options:

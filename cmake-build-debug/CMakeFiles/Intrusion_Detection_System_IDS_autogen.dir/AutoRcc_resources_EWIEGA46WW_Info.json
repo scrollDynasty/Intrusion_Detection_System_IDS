@@ -1,0 +1,26 @@
+{
+	"BUILD_DIR" : "D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug/Intrusion_Detection_System_IDS_autogen",
+	"CMAKE_BINARY_DIR" : "D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug",
+	"CMAKE_CURRENT_BINARY_DIR" : "D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug",
+	"CMAKE_CURRENT_SOURCE_DIR" : "D:/projects/Intrusion_Detection_System_IDS",
+	"CMAKE_SOURCE_DIR" : "D:/projects/Intrusion_Detection_System_IDS",
+	"CROSS_CONFIG" : false,
+	"GENERATOR" : "MinGW Makefiles",
+	"INCLUDE_DIR" : "D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug/Intrusion_Detection_System_IDS_autogen/include",
+	"INPUTS" : 
+	[
+		"D:/projects/Intrusion_Detection_System_IDS/resources/style.qss",
+		"D:/projects/Intrusion_Detection_System_IDS/resources/down-arrow.svg"
+	],
+	"LOCK_FILE" : "D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug/CMakeFiles/Intrusion_Detection_System_IDS_autogen.dir/AutoRcc_resources_EWIEGA46WW_Lock.lock",
+	"MULTI_CONFIG" : false,
+	"OPTIONS" : [ "--no-zstd", "-name", "resources" ],
+	"OUTPUT_CHECKSUM" : "EWIEGA46WW",
+	"OUTPUT_NAME" : "qrc_resources.cpp",
+	"RCC_EXECUTABLE" : "C:/Qt/6.8.2/mingw_64/bin/rcc.exe",
+	"RCC_LIST_OPTIONS" : [ "--list" ],
+	"SETTINGS_FILE" : "D:/projects/Intrusion_Detection_System_IDS/cmake-build-debug/CMakeFiles/Intrusion_Detection_System_IDS_autogen.dir/AutoRcc_resources_EWIEGA46WW_Used.txt",
+	"SOURCE" : "D:/projects/Intrusion_Detection_System_IDS/resources.qrc",
+	"USE_BETTER_GRAPH" : true,
+	"VERBOSITY" : 0
+}

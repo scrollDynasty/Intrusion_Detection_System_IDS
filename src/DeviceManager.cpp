@@ -1,6 +1,7 @@
 #include "DeviceManager.h"
 #include <iostream>
 #include <pcap.h>
+#include <QStringList>
 
 std::string DeviceManager::chooseDevice() {
     char errorBuffer[PCAP_ERRBUF_SIZE];
@@ -38,4 +39,44 @@ std::string DeviceManager::chooseDevice() {
     pcap_freealldevs(allDevices);
 
     return deviceName;
+}
+
+QStringList DeviceManager::getDeviceList() {
+    QStringList deviceList;
+    
+    // Очищаем карту имен устройств
+    deviceNamesMap.clear();
+    
+    char errorBuffer[PCAP_ERRBUF_SIZE];
+    pcap_if_t* allDevices;
+    if (pcap_findalldevs(&allDevices, errorBuffer) == -1) {
+        std::cerr << "Error: " << errorBuffer << std::endl;
+        return deviceList;
+    }
+    
+    int index = 0;
+    for (pcap_if_t* device = allDevices; device != nullptr; device = device->next) {
+        // Сохраняем имя устройства в карту
+        deviceNamesMap[index] = device->name;
+        
+        // Создаем строку для отображения в UI
+        QString displayName = device->name;
+        if (device->description) {
+            displayName += " (" + QString(device->description) + ")";
+        }
+        deviceList.append(displayName);
+        
+        index++;
+    }
+    
+    pcap_freealldevs(allDevices);
+    
+    return deviceList;
+}
+
+std::string DeviceManager::getDeviceNameByIndex(int index) const {
+    if (deviceNamesMap.contains(index)) {
+        return deviceNamesMap[index];
+    }
+    return "";
 }
