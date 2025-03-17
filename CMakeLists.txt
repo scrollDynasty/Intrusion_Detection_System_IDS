@@ -66,12 +66,12 @@ link_directories(${CMAKE_SOURCE_DIR}/npcap/Lib/x64)
 # Создаем обычный исполняемый файл без запроса прав администратора
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES} ${RESOURCES})
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME} PRIVATE
     Packet
     wpcap
-    ws2_32.lib
+    ws2_32
+    iphlpapi
     Qt6::Widgets
-    Qt6::Core
 )
 
 # Копируем необходимые DLL-файлы в директорию сборки

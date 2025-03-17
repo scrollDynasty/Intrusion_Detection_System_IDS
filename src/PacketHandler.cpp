@@ -4,14 +4,13 @@
 #include <ctime>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <iphlpapi.h>
 #include <QDateTime>
 #include <QMetaType>
 #include <QThread>
 #include <QDebug>
 #include <functional>
 #include <thread>
-
-#pragma comment(lib, "Ws2_32.lib")
 
 struct ip_hdr {
     unsigned char ip_hl : 4;
@@ -136,6 +135,19 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
         
         qDebug() << "IP пакет:" << sourceIP << "->" << destIP << "Протокол:" << (int)ipHeader->ip_p;
         
+        // Проверяем, является ли IP-адрес источника или назначения локальным
+        bool isSourceLocal = false;
+        bool isDestLocal = false;
+        
+        for (const auto& localIP : handler->localIPAddresses) {
+            if (localIP == sourceIP) {
+                isSourceLocal = true;
+            }
+            if (localIP == destIP) {
+                isDestLocal = true;
+            }
+        }
+        
         // Определяем тип пакета
         QString packetType;
         QString details;
@@ -174,7 +186,11 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                         
                         // Проверяем на возможное сканирование портов
                         // Сканирование портов обычно направлено на привилегированные порты (< 1024)
-                        if (destPort < 1024) {
+                        // Теперь проверяем как внешние, так и внутренние сканирования
+                        if (destPort < 1024 && isDestLocal && !isSourceLocal) {
+                            details = " (Порт " + QString::number(sourcePort) + " -> " + QString::number(destPort) + ") Возможное сканирование портов с внешнего IP";
+                            isPotentialThreat = true;
+                        } else if (destPort < 1024) {
                             details = " (Порт " + QString::number(sourcePort) + " -> " + QString::number(destPort) + ") Возможное сканирование портов";
                             isPotentialThreat = true;
                         } else {
@@ -208,7 +224,11 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                     
                     // Если это попытка подключения (SYN) к известному порту
                     if (tcpHeader->flags & 0x02 && !(tcpHeader->flags & 0x10)) {
-                        details += " (Попытка подключения к потенциально уязвимому сервису)";
+                        if (!isSourceLocal && isDestLocal) {
+                            details += " (Попытка подключения к потенциально уязвимому сервису с внешнего IP)";
+                        } else {
+                            details += " (Попытка подключения к потенциально уязвимому сервису)";
+                        }
                         isPotentialThreat = true;
                     }
                 }
@@ -240,6 +260,11 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                     destPort == 1900 || // UPnP
                     destPort == 5353) { // mDNS
                     
+                    // Если пакет направлен на локальный компьютер с внешнего IP
+                    if (!isSourceLocal && isDestLocal) {
+                        details += " (Возможный UDP флуд с внешнего IP)";
+                        isPotentialThreat = true;
+                    }
                     // Здесь можно добавить логику для отслеживания частоты UDP пакетов
                     // на эти порты для обнаружения UDP флуда
                 }
@@ -250,10 +275,17 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                 qDebug() << "ICMP пакет:" << sourceIP << "->" << destIP;
                 
                 packetType = "ICMP";
-                details = " (ping)";
                 
-                // Здесь можно добавить логику для отслеживания частоты ICMP пакетов
-                // для обнаружения ping flood
+                // Если пакет направлен на локальный компьютер с внешнего IP
+                if (!isSourceLocal && isDestLocal) {
+                    details = " (ping с внешнего IP)";
+                    
+                    // С некоторой вероятностью помечаем как потенциальную угрозу
+                    // Здесь можно добавить логику для отслеживания частоты ICMP пакетов
+                    // для обнаружения ping flood
+                } else {
+                    details = " (ping)";
+                }
                 
                 break;
             }
@@ -282,6 +314,84 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
     }
 }
 
+std::vector<std::string> PacketHandler::getLocalIPAddresses() {
+    std::vector<std::string> ipAddresses;
+    
+    // Инициализируем Winsock
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        qDebug() << "Ошибка при инициализации Winsock";
+        return ipAddresses;
+    }
+    
+    // Получаем информацию об адаптерах
+    ULONG bufferSize = 15000;
+    PIP_ADAPTER_ADDRESSES pAddresses = (IP_ADAPTER_ADDRESSES*)malloc(bufferSize);
+    
+    if (pAddresses == nullptr) {
+        qDebug() << "Ошибка выделения памяти для IP_ADAPTER_ADDRESSES";
+        WSACleanup();
+        return ipAddresses;
+    }
+    
+    DWORD result = GetAdaptersAddresses(AF_INET, 0, nullptr, pAddresses, &bufferSize);
+    
+    if (result == ERROR_BUFFER_OVERFLOW) {
+        free(pAddresses);
+        pAddresses = (IP_ADAPTER_ADDRESSES*)malloc(bufferSize);
+        
+        if (pAddresses == nullptr) {
+            qDebug() << "Ошибка выделения памяти для IP_ADAPTER_ADDRESSES после переполнения буфера";
+            WSACleanup();
+            return ipAddresses;
+        }
+        
+        result = GetAdaptersAddresses(AF_INET, 0, nullptr, pAddresses, &bufferSize);
+    }
+    
+    if (result != NO_ERROR) {
+        qDebug() << "Ошибка при получении информации об адаптерах:" << result;
+        free(pAddresses);
+        WSACleanup();
+        return ipAddresses;
+    }
+    
+    // Перебираем все адаптеры и их IP-адреса
+    for (PIP_ADAPTER_ADDRESSES pCurrAddresses = pAddresses; pCurrAddresses != nullptr; pCurrAddresses = pCurrAddresses->Next) {
+        // Пропускаем отключенные адаптеры
+        if (pCurrAddresses->OperStatus != IfOperStatusUp) {
+            continue;
+        }
+        
+        // Получаем IP-адреса для текущего адаптера
+        PIP_ADAPTER_UNICAST_ADDRESS pUnicast = pCurrAddresses->FirstUnicastAddress;
+        while (pUnicast != nullptr) {
+            // Проверяем, что это IPv4 адрес
+            if (pUnicast->Address.lpSockaddr->sa_family == AF_INET) {
+                sockaddr_in* sockaddr = reinterpret_cast<sockaddr_in*>(pUnicast->Address.lpSockaddr);
+                char ipStr[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &(sockaddr->sin_addr), ipStr, INET_ADDRSTRLEN);
+                
+                // Добавляем IP-адрес в список
+                ipAddresses.push_back(ipStr);
+                qDebug() << "Найден локальный IP-адрес:" << ipStr;
+            }
+            
+            pUnicast = pUnicast->Next;
+        }
+    }
+    
+    // Добавляем localhost
+    ipAddresses.push_back("127.0.0.1");
+    qDebug() << "Добавлен localhost: 127.0.0.1";
+    
+    // Освобождаем ресурсы
+    free(pAddresses);
+    WSACleanup();
+    
+    return ipAddresses;
+}
+
 bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMessage) {
     try {
         if (isRunning) {
@@ -290,6 +400,9 @@ bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMe
             }
             return false;
         }
+        
+        // Получаем локальные IP-адреса
+        localIPAddresses = getLocalIPAddresses();
         
         char errorBuffer[PCAP_ERRBUF_SIZE];
         
@@ -323,6 +436,7 @@ bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMe
         qDebug() << "Открываем устройство:" << QString::fromStdString(deviceName);
         
         // Открываем устройство для захвата пакетов в режиме promiscuous
+        // Устанавливаем режим promiscuous (1), чтобы захватывать все пакеты в сети
         handle = pcap_open_live(deviceName.c_str(), BUFSIZ, 1, 100, errorBuffer);
 
         if (handle == nullptr) {
@@ -342,9 +456,12 @@ bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMe
             qDebug() << "Предупреждение: устройство не использует Ethernet. Захват может работать некорректно.";
         }
         
-        // Устанавливаем пустой фильтр, чтобы захватывать все пакеты
+        // Устанавливаем фильтр для захвата всех пакетов в сети
         struct bpf_program fp;
-        if (pcap_compile(handle, &fp, "", 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        // Пустой фильтр для захвата всех пакетов
+        const char* filter = "";
+        
+        if (pcap_compile(handle, &fp, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
             if (errorMessage) {
                 *errorMessage = QString("Ошибка при компиляции фильтра: %1").arg(pcap_geterr(handle));
             }

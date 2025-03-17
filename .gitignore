@@ -7,7 +7,8 @@ release/
 x64/
 Win32/
 .venv
-
+deploy.bat
+deploy
 # Файлы Qt
 *.pro.user
 *.pro.user.*
