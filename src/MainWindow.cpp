@@ -7,6 +7,9 @@
 #include <QGraphicsDropShadowEffect>
 #include <QRandomGenerator>
 #include <QScrollBar>
+#include <QSpacerItem>
+#include <QGridLayout>
+#include <QSizePolicy>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -119,13 +122,17 @@ void MainWindow::onStartCapture()
     }
     
     // Предупреждаем пользователя о необходимости прав администратора и правильного сетевого адаптера
-    QMessageBox::information(this, "Информация", 
-                           "Для захвата всех пакетов в сети необходимо:\n\n"
-                           "1. Запустить программу от имени администратора\n"
-                           "2. Выбрать правильный сетевой адаптер (физический, а не виртуальный)\n"
-                           "3. Убедиться, что сетевой адаптер поддерживает режим promiscuous\n\n"
-                           "Это позволит обнаруживать сканирование портов и другие атаки с других компьютеров в сети.\n\n"
-                           "Если программа закроется после нажатия OK, перезапустите ее от имени администратора.");
+    QMessageBox msgInfo;
+    msgInfo.setWindowTitle("Информация");
+    msgInfo.setIcon(QMessageBox::Information);
+    msgInfo.setText("Для захвата всех пакетов в сети необходимо:\n\n"
+                   "1. Запустить программу от имени администратора\n"
+                   "2. Выбрать правильный сетевой адаптер (физический, а не виртуальный)\n"
+                   "3. Убедиться, что сетевой адаптер поддерживает режим promiscuous\n\n"
+                   "Это позволит обнаруживать сканирование портов и другие атаки с других компьютеров в сети.\n\n"
+                   "Если программа закроется после нажатия OK, перезапустите ее от имени администратора.");
+    msgInfo.setStandardButtons(QMessageBox::Ok);
+    msgInfo.exec();
     
     // Пробуем запустить захват пакетов
     QString errorMessage;
@@ -169,6 +176,16 @@ void MainWindow::onStartCapture()
         msgBox.setText("Не удалось запустить захват пакетов");
         msgBox.setDetailedText(detailedError);
         msgBox.setStandardButtons(QMessageBox::Ok);
+        
+        // Устанавливаем кодировку для корректного отображения текста на всех компьютерах
+        QFont font = msgBox.font();
+        msgBox.setFont(font);
+        
+        // Увеличиваем размер окна для лучшей читаемости
+        QSpacerItem* horizontalSpacer = new QSpacerItem(500, 0, QSizePolicy::Minimum, QSizePolicy::Expanding);
+        QGridLayout* layout = (QGridLayout*)msgBox.layout();
+        layout->addItem(horizontalSpacer, layout->rowCount(), 0, 1, layout->columnCount());
+        
         msgBox.exec();
     }
 }
@@ -278,6 +295,12 @@ void MainWindow::setupModernUI()
     ui->textEditLog->document()->setMaximumBlockCount(1000); // Ограничиваем количество строк
     ui->textEditLog->setLineWrapMode(QTextEdit::WidgetWidth); // Автоматический перенос текста
     ui->textEditLog->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere); // Перенос по словам или символам
+    
+    // Устанавливаем шрифт и кодировку для корректного отображения текста
+    QFont font = ui->textEditLog->font();
+    font.setFamily("Consolas");
+    font.setPointSize(10);
+    ui->textEditLog->setFont(font);
     
     // Настраиваем сплиттер для автоматического изменения размера
     ui->splitter->setStretchFactor(0, 1); // Таблица

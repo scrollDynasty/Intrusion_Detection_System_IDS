@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 > nul
 echo Запуск Intrusion Detection System в Docker
 
 REM Проверка наличия Docker

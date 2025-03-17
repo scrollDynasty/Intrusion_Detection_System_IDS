@@ -48,6 +48,7 @@ void messageHandler(QtMsgType type, const QMessageLogContext &context, const QSt
     }
     
     QTextStream out(&logFile);
+    
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
     
     switch (type) {
@@ -73,7 +74,7 @@ void messageHandler(QtMsgType type, const QMessageLogContext &context, const QSt
     out.flush();
     logFile.close();
     
-    // Дублируем вывод в консоль
+    // Дублируем вывод в консоль с правильной кодировкой
     fprintf(stderr, "%s\n", qPrintable(msg));
 }
 
