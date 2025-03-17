@@ -135,6 +135,12 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
         
         qDebug() << "IP пакет:" << sourceIP << "->" << destIP << "Протокол:" << (int)ipHeader->ip_p;
         
+        // Выводим список локальных IP для отладки
+        qDebug() << "Локальные IP-адреса:";
+        for (const auto& ip : handler->localIPAddresses) {
+            qDebug() << "  " << QString::fromStdString(ip);
+        }
+        
         // Проверяем, является ли IP-адрес источника или назначения локальным
         bool isSourceLocal = false;
         bool isDestLocal = false;
@@ -142,10 +148,19 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
         for (const auto& localIP : handler->localIPAddresses) {
             if (localIP == sourceIP) {
                 isSourceLocal = true;
+                qDebug() << "IP источника" << sourceIP << "является локальным";
             }
             if (localIP == destIP) {
                 isDestLocal = true;
+                qDebug() << "IP назначения" << destIP << "является локальным";
             }
+        }
+        
+        if (!isSourceLocal) {
+            qDebug() << "IP источника" << sourceIP << "является внешним";
+        }
+        if (!isDestLocal) {
+            qDebug() << "IP назначения" << destIP << "является внешним";
         }
         
         // Определяем тип пакета
@@ -177,6 +192,26 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                 qDebug() << "TCP пакет:" << sourceIP << ":" << sourcePort << "->" << destIP << ":" << destPort;
                 qDebug() << "TCP флаги:" << QString("0x%1").arg(tcpHeader->flags, 2, 16, QChar('0'));
                 
+                // Проверяем, является ли это сканированием портов с другого компьютера
+                // Если источник не локальный, а назначение локальное, и это SYN пакет - вероятно, это сканирование
+                if (!isSourceLocal && isDestLocal && (tcpHeader->flags & 0x02) && !(tcpHeader->flags & 0x10)) {
+                    qDebug() << "ВНИМАНИЕ: Обнаружено возможное сканирование портов с внешнего IP:" << sourceIP;
+                    qDebug() << "  Порт назначения:" << destPort;
+                    
+                    packetType = "TCP SYN";
+                    details = " (Порт " + QString::number(sourcePort) + " → " + QString::number(destPort) + ") Возможное сканирование портов с внешнего IP";
+                    isPotentialThreat = true;
+                    
+                    // Увеличиваем счетчик пакетов
+                    handler->incrementPacketCount();
+                    
+                    // Отправляем сигнал с информацией о пакете
+                    qDebug() << "Отправляем сигнал packetDetected:" << QString(sourceIP) << QString(destIP) << packetType + details << timestamp;
+                    emit handler->packetDetected(QString(sourceIP), QString(destIP), packetType + details, timestamp, isPotentialThreat);
+                    
+                    return;
+                }
+                
                 // Определяем флаги TCP
                 if (tcpHeader->flags & 0x02) { // SYN
                     if (tcpHeader->flags & 0x10) { // ACK
@@ -188,10 +223,18 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                         // Сканирование портов обычно направлено на привилегированные порты (< 1024)
                         // Теперь проверяем как внешние, так и внутренние сканирования
                         if (destPort < 1024 && isDestLocal && !isSourceLocal) {
-                            details = " (Порт " + QString::number(sourcePort) + " -> " + QString::number(destPort) + ") Возможное сканирование портов с внешнего IP";
+                            details = " (Порт " + QString::number(sourcePort) + " → " + QString::number(destPort) + ") Возможное сканирование портов с внешнего IP";
                             isPotentialThreat = true;
+                            
+                            // Выводим подробную информацию о сканировании портов
+                            qDebug() << "ОБНАРУЖЕНО СКАНИРОВАНИЕ ПОРТОВ:";
+                            qDebug() << "  Внешний IP:" << sourceIP;
+                            qDebug() << "  Локальный IP:" << destIP;
+                            qDebug() << "  Порт источника:" << sourcePort;
+                            qDebug() << "  Порт назначения:" << destPort;
+                            qDebug() << "  TCP флаги:" << QString("0x%1").arg(tcpHeader->flags, 2, 16, QChar('0'));
                         } else if (destPort < 1024) {
-                            details = " (Порт " + QString::number(sourcePort) + " -> " + QString::number(destPort) + ") Возможное сканирование портов";
+                            details = " (Порт " + QString::number(sourcePort) + " → " + QString::number(destPort) + ") Возможное сканирование портов";
                             isPotentialThreat = true;
                         } else {
                             details = " (Порт " + QString::number(sourcePort) + " -> " + QString::number(destPort) + ")";
@@ -404,6 +447,12 @@ bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMe
         // Получаем локальные IP-адреса
         localIPAddresses = getLocalIPAddresses();
         
+        // Выводим список локальных IP для отладки
+        qDebug() << "Локальные IP-адреса:";
+        for (const auto& ip : localIPAddresses) {
+            qDebug() << "  " << QString::fromStdString(ip);
+        }
+        
         char errorBuffer[PCAP_ERRBUF_SIZE];
         
         // Проверяем, существует ли устройство
@@ -437,7 +486,8 @@ bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMe
         
         // Открываем устройство для захвата пакетов в режиме promiscuous
         // Устанавливаем режим promiscuous (1), чтобы захватывать все пакеты в сети
-        handle = pcap_open_live(deviceName.c_str(), BUFSIZ, 1, 100, errorBuffer);
+        // Увеличиваем таймаут до 1000 мс для лучшего захвата пакетов
+        handle = pcap_open_live(deviceName.c_str(), BUFSIZ, 1, 1000, errorBuffer);
 
         if (handle == nullptr) {
             if (errorMessage) {
@@ -445,6 +495,17 @@ bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMe
             }
             std::cerr << "Error: " << errorBuffer << std::endl;
             return false;
+        }
+        
+        // Проверяем, что устройство поддерживает режим promiscuous
+        // Для этого пробуем получить статистику
+        struct pcap_stat stats;
+        if (pcap_stats(handle, &stats) != 0) {
+            qDebug() << "Предупреждение: не удалось получить статистику устройства. Возможно, режим promiscuous не поддерживается.";
+        } else {
+            qDebug() << "Статистика устройства: получено пакетов:" << stats.ps_recv 
+                     << ", отброшено:" << stats.ps_drop 
+                     << ", отброшено интерфейсом:" << stats.ps_ifdrop;
         }
         
         // Проверяем тип канального уровня
@@ -481,6 +542,18 @@ bool PacketHandler::startCapture(const std::string& deviceName, QString* errorMe
         }
         
         pcap_freecode(&fp);
+        
+        // Проверяем, включен ли режим promiscuous
+        int status = pcap_setnonblock(handle, 1, errorBuffer);
+        if (status != 0) {
+            qDebug() << "Предупреждение: не удалось установить неблокирующий режим:" << errorBuffer;
+        }
+        
+        qDebug() << "Режим promiscuous активирован. Захват всех пакетов в сети.";
+        
+        // Выводим предупреждение о том, что для работы в режиме promiscuous нужны права администратора
+        qDebug() << "ВАЖНО: Для работы в режиме promiscuous необходимо запустить программу от имени администратора.";
+        qDebug() << "       Также убедитесь, что выбранный сетевой адаптер поддерживает режим promiscuous.";
 
         isRunning = true;
         packetCount = 0;
