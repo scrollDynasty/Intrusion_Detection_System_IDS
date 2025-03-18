@@ -38,21 +38,21 @@ QVariant SuspiciousIPModel::data(const QModelIndex &index, int role) const {
         // Улучшенное выделение записей в зависимости от количества пакетов
         if (record.count > 20) {
             // Критический уровень - яркий красный
-            return QBrush(QColor(255, 100, 100, 200));
+            return QBrush(QColor(255, 80, 80, 255));
         } else if (record.count > 10) {
             // Высокий уровень - оранжевый
-            return QBrush(QColor(255, 165, 0, 180));
+            return QBrush(QColor(255, 150, 0, 255));
         } else if (record.count > 5) {
             // Средний уровень - желтый
-            return QBrush(QColor(255, 255, 0, 150));
+            return QBrush(QColor(255, 255, 0, 255));
+        } else {
+            // Низкий уровень - светло-желтый
+            return QBrush(QColor(255, 255, 200, 255));
         }
     } else if (role == Qt::ForegroundRole) {
-        // Цвет текста для лучшей читаемости
-        if (record.count > 20) {
-            return QBrush(QColor(255, 255, 255)); // Белый текст на красном фоне
-        } else if (record.count > 10) {
-            return QBrush(QColor(0, 0, 0)); // Черный текст на оранжевом фоне
-        }
+        // Цвет текста для лучшей читаемости - ВСЕГДА используем черный цвет,
+        // чтобы на всех фонах было хорошо видно
+        return QBrush(QColor(0, 0, 0));
     } else if (role == Qt::FontRole) {
         QFont font;
         if (record.count > 20) {
@@ -66,23 +66,54 @@ QVariant SuspiciousIPModel::data(const QModelIndex &index, int role) const {
     } else if (role == Qt::ToolTipRole) {
         // Добавляем всплывающую подсказку с дополнительной информацией
         QString severity;
+        QString severityColor;
+        
         if (record.count > 20) {
             severity = "Критический";
+            severityColor = "#FF0000"; // Красный
         } else if (record.count > 10) {
             severity = "Высокий";
+            severityColor = "#FF9900"; // Оранжевый
         } else if (record.count > 5) {
             severity = "Средний";
+            severityColor = "#FFCC00"; // Желтый
         } else {
             severity = "Низкий";
+            severityColor = "#66CC66"; // Зеленый
         }
         
-        return QString("Источник: %1\nНазначение: %2\nТип: %3\nВремя: %4\nКоличество: %5\nУровень угрозы: %6")
-                .arg(record.sourceIP)
-                .arg(record.destinationIP)
-                .arg(record.packetType)
-                .arg(record.timestamp.toString("yyyy-MM-dd hh:mm:ss"))
-                .arg(record.count)
-                .arg(severity);
+        // Создаем форматированную строку с HTML для лучшего отображения
+        return QString(
+            "<html>"
+            "<head>"
+            "<style>"
+            "table { border-collapse: collapse; width: 100%; }"
+            "th, td { padding: 4px; text-align: left; }"
+            "th { background-color: #666; color: white; }"
+            "td { border-bottom: 1px solid #ddd; }"
+            "</style>"
+            "</head>"
+            "<body style='background-color: #f8f8f8; color: #333;'>"
+            "<h3 style='margin: 0 0 10px 0;'>Информация о подозрительном IP</h3>"
+            "<table>"
+            "<tr><th>Параметр</th><th>Значение</th></tr>"
+            "<tr><td>Источник:</td><td>%1</td></tr>"
+            "<tr><td>Назначение:</td><td>%2</td></tr>"
+            "<tr><td>Тип пакета:</td><td>%3</td></tr>"
+            "<tr><td>Время:</td><td>%4</td></tr>"
+            "<tr><td>Количество пакетов:</td><td>%5</td></tr>"
+            "<tr><td>Уровень угрозы:</td><td><span style='font-weight: bold; color: %6;'>%7</span></td></tr>"
+            "</table>"
+            "</body>"
+            "</html>"
+        )
+        .arg(record.sourceIP)
+        .arg(record.destinationIP)
+        .arg(record.packetType)
+        .arg(record.timestamp.toString("yyyy-MM-dd hh:mm:ss"))
+        .arg(record.count)
+        .arg(severityColor)
+        .arg(severity);
     }
 
     return QVariant();
@@ -106,12 +137,15 @@ void SuspiciousIPModel::addSuspiciousIP(const QString& sourceIP, const QString& 
     // Создаем ключ для поиска в карте
     QString key = sourceIP + "->" + destinationIP;
     
+    // Всегда обновляем запись, даже если она уже существует
     // Проверяем, есть ли уже такая запись
     if (ipIndexMap.contains(key)) {
         int row = ipIndexMap[key];
         records[row].count++;
         records[row].timestamp = QDateTime::currentDateTime();
-        emit dataChanged(index(row, 3), index(row, 4));
+        records[row].packetType = packetType; // Обновляем также тип пакета
+        // Обновляем больше ячеек, чтобы строка полностью перерисовалась
+        emit dataChanged(index(row, 0), index(row, 4));
     } else {
         // Добавляем новую запись
         beginInsertRows(QModelIndex(), records.size(), records.size());

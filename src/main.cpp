@@ -3,6 +3,12 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+// Заголовочные файлы для поддержки UTF-8
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 #include <QApplication>
 #include <QMessageBox>
 #include <QStyleFactory>
@@ -13,6 +19,9 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+#include <QTextCodec>
+#endif
 #include "MainWindow.h"
 #include "PacketHandler.h"
 
@@ -48,6 +57,7 @@ void messageHandler(QtMsgType type, const QMessageLogContext &context, const QSt
     }
     
     QTextStream out(&logFile);
+    // В Qt6 нет setCodec, но QTextStream по умолчанию использует UTF-8
     
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
     
@@ -75,10 +85,38 @@ void messageHandler(QtMsgType type, const QMessageLogContext &context, const QSt
     logFile.close();
     
     // Дублируем вывод в консоль с правильной кодировкой
+    #ifdef _WIN32
+    static FILE* consoleOut = nullptr;
+    if (!consoleOut) {
+        // Открываем консоль в режиме UTF-8 только один раз
+        consoleOut = _fdopen(_dup(fileno(stderr)), "w");
+        if (consoleOut) {
+            // Устанавливаем UTF-8 для потока вывода
+            _setmode(_fileno(consoleOut), _O_U8TEXT);
+        }
+    }
+    
+    if (consoleOut) {
+        // Используем широкие символы для вывода в консоль
+        fwprintf(consoleOut, L"%ls\n", msg.toStdWString().c_str());
+        fflush(consoleOut);
+    } else {
+        // Резервный вариант, если не удалось настроить UTF-8
+        fprintf(stderr, "%s\n", qPrintable(msg));
+    }
+    #else
+    // Для не-Windows систем просто используем стандартный вывод
     fprintf(stderr, "%s\n", qPrintable(msg));
+    #endif
 }
 
 int main(int argc, char *argv[]) {
+    // Обязательно включаем поддержку UTF-8 в приложении
+    #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
+    #endif
+    
     // Устанавливаем обработчик сообщений для перенаправления вывода в файл
     qInstallMessageHandler(messageHandler);
     
@@ -86,6 +124,10 @@ int main(int argc, char *argv[]) {
     #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
+    
+    // Устанавливаем режим UTF-8 для стандартных потоков
+    _setmode(_fileno(stdout), _O_U8TEXT);
+    _setmode(_fileno(stderr), _O_U8TEXT);
     #endif
 
     QApplication app(argc, argv);

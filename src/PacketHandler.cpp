@@ -11,6 +11,9 @@
 #include <QDebug>
 #include <functional>
 #include <thread>
+#include <unordered_map>
+#include <chrono>
+#include <QFile>
 
 struct ip_hdr {
     unsigned char ip_hl : 4;
@@ -38,8 +41,86 @@ struct tcp_hdr {
     unsigned short urgent_ptr;
 };
 
+// Структура для отслеживания частоты пакетов для обнаружения DOS-атак
+struct PacketFrequencyTracker {
+    std::unordered_map<std::string, int> packetCount; // IP -> количество пакетов
+    std::unordered_map<std::string, std::chrono::steady_clock::time_point> lastReset; // IP -> время последнего сброса
+    
+    // Константы для обнаружения атак
+    static constexpr int SYN_FLOOD_THRESHOLD = 100; // Порог для SYN-флуда
+    static constexpr int UDP_FLOOD_THRESHOLD = 150; // Порог для UDP-флуда
+    static constexpr int ICMP_FLOOD_THRESHOLD = 50; // Порог для ICMP-флуда
+    static constexpr int INTERVAL_SECONDS = 60;     // Интервал для измерения (в секундах)
+    
+    // Увеличивает счетчик пакетов для заданного IP-адреса и проверяет порог
+    bool incrementAndCheck(const std::string& ip, int threshold, const std::string& attackType) {
+        auto now = std::chrono::steady_clock::now();
+        
+        // Если это первый пакет или истек интервал, сбросить счетчик
+        if (lastReset.find(ip) == lastReset.end() || 
+            std::chrono::duration_cast<std::chrono::seconds>(now - lastReset[ip]).count() > INTERVAL_SECONDS) {
+            packetCount[ip] = 1;
+            lastReset[ip] = now;
+            return false;
+        }
+        
+        // Увеличиваем счетчик
+        packetCount[ip]++;
+        
+        // Проверяем, превышен ли порог
+        if (packetCount[ip] > threshold) {
+            qDebug() << "ALERT: Possible" << QString::fromStdString(attackType) << "attack detected from IP:" << QString::fromStdString(ip) 
+                    << "(" << packetCount[ip] << "packets in" << INTERVAL_SECONDS << "seconds)";
+            return true;
+        }
+        
+        return false;
+    }
+};
+
+// Структура для отслеживания попыток подключения для обнаружения брутфорс-атак
+struct BruteForceTracker {
+    std::unordered_map<std::string, std::unordered_map<int, int>> connectionAttempts; // IP -> (порт -> количество)
+    std::unordered_map<std::string, std::chrono::steady_clock::time_point> lastReset; // IP -> время последнего сброса
+    
+    // Константы для обнаружения атак
+    static constexpr int BRUTE_FORCE_THRESHOLD = 10; // Порог для брутфорса
+    static constexpr int INTERVAL_SECONDS = 60;      // Интервал для измерения (в секундах)
+    
+    // Увеличивает счетчик попыток для заданного IP-адреса и порта, проверяет порог
+    bool incrementAndCheck(const std::string& ip, int port) {
+        auto now = std::chrono::steady_clock::now();
+        
+        // Если это первая попытка или истек интервал, сбросить счетчик
+        if (lastReset.find(ip) == lastReset.end() || 
+            std::chrono::duration_cast<std::chrono::seconds>(now - lastReset[ip]).count() > INTERVAL_SECONDS) {
+            connectionAttempts[ip].clear();
+            connectionAttempts[ip][port] = 1;
+            lastReset[ip] = now;
+            return false;
+        }
+        
+        // Увеличиваем счетчик
+        connectionAttempts[ip][port]++;
+        
+        // Проверяем, превышен ли порог
+        if (connectionAttempts[ip][port] > BRUTE_FORCE_THRESHOLD) {
+            qDebug() << "ALERT: Possible brute force attack detected from IP:" << QString::fromStdString(ip) 
+                    << "to port" << port << "(" << connectionAttempts[ip][port] << "attempts in" << INTERVAL_SECONDS << "seconds)";
+            return true;
+        }
+        
+        return false;
+    }
+};
+
+// Добавляем статические экземпляры трекеров
+static PacketFrequencyTracker dosTracker;
+static BruteForceTracker bruteForceTracker;
+
 PacketHandler::PacketHandler(QObject *parent)
-    : QObject(parent), handle(nullptr), isRunning(false), packetCount(0) {
+    : QObject(parent), handle(nullptr), isRunning(false), packetCount(0), encryptLogFile(false) {
+    localIPAddresses = getLocalIPAddresses();
 }
 
 PacketHandler::~PacketHandler() {
@@ -192,6 +273,24 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                 qDebug() << "TCP пакет:" << sourceIP << ":" << sourcePort << "->" << destIP << ":" << destPort;
                 qDebug() << "TCP флаги:" << QString("0x%1").arg(tcpHeader->flags, 2, 16, QChar('0'));
                 
+                // Проверяем известные сервисы на предмет возможных брутфорс-атак
+                if ((destPort == 22 || destPort == 23 || destPort == 3389 || destPort == 5900 || 
+                     destPort == 21 || destPort == 3306 || destPort == 1433) && 
+                    (tcpHeader->flags & 0x02) && isDestLocal && !isSourceLocal) {
+                    if (bruteForceTracker.incrementAndCheck(sourceIP, destPort)) {
+                        details = " (Порт " + QString::number(sourcePort) + " → " + QString::number(destPort) + ") ВОЗМОЖНАЯ БРУТФОРС-АТАКА!";
+                        isPotentialThreat = true;
+                    }
+                }
+                
+                // Проверяем на SYN-флуд (много SYN пакетов)
+                if ((tcpHeader->flags & 0x02) && !(tcpHeader->flags & 0x10) && isDestLocal) {
+                    if (dosTracker.incrementAndCheck(sourceIP, dosTracker.SYN_FLOOD_THRESHOLD, "SYN flood")) {
+                        details += " (ВОЗМОЖНАЯ SYN-ФЛУД АТАКА!)";
+                        isPotentialThreat = true;
+                    }
+                }
+                
                 // Проверяем, является ли это сканированием портов с другого компьютера
                 // Если источник не локальный, а назначение локальное, и это SYN пакет - вероятно, это сканирование
                 if (!isSourceLocal && isDestLocal && (tcpHeader->flags & 0x02) && !(tcpHeader->flags & 0x10)) {
@@ -297,6 +396,14 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                 packetType = "UDP";
                 details = " (Порт " + QString::number(sourcePort) + " -> " + QString::number(destPort) + ")";
                 
+                // Проверка на UDP-флуд атаки
+                if (isDestLocal) {
+                    if (dosTracker.incrementAndCheck(sourceIP, dosTracker.UDP_FLOOD_THRESHOLD, "UDP flood")) {
+                        details += " (ВОЗМОЖНАЯ UDP-ФЛУД АТАКА!)";
+                        isPotentialThreat = true;
+                    }
+                }
+                
                 // Проверка на известные уязвимые UDP порты
                 if (destPort == 53 || // DNS
                     destPort == 161 || destPort == 162 || // SNMP
@@ -318,6 +425,14 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
                 qDebug() << "ICMP пакет:" << sourceIP << "->" << destIP;
                 
                 packetType = "ICMP";
+                
+                // Проверка на ICMP-флуд атаки
+                if (isDestLocal) {
+                    if (dosTracker.incrementAndCheck(sourceIP, dosTracker.ICMP_FLOOD_THRESHOLD, "ICMP flood")) {
+                        details += " (ВОЗМОЖНАЯ PING-ФЛУД АТАКА!)";
+                        isPotentialThreat = true;
+                    }
+                }
                 
                 // Если пакет направлен на локальный компьютер с внешнего IP
                 if (!isSourceLocal && isDestLocal) {
@@ -344,6 +459,19 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
         
         // Увеличиваем счетчик пакетов
         handler->incrementPacketCount();
+        
+        // Если включено шифрование логов - добавляем пакет в зашифрованные данные
+        if (handler->isLogEncryptionEnabled()) {
+            QString logEntry = QString("%1|%2|%3|%4|%5\n")
+                .arg(timestamp)
+                .arg(sourceIP)
+                .arg(destIP)
+                .arg(packetType)
+                .arg(isPotentialThreat ? "УГРОЗА" : "НОРМА");
+                
+            // Добавляем запись в зашифрованные данные
+            handler->encryptedLogData.append(logEntry.toUtf8());
+        }
         
         // Отправляем сигнал с информацией о пакете
         qDebug() << "Отправляем сигнал packetDetected:" << QString(sourceIP) << QString(destIP) << packetType + details << timestamp;
@@ -619,4 +747,70 @@ void PacketHandler::stopCapture() {
     catch (...) {
         qCritical() << "Неизвестное исключение в stopCapture";
     }
+}
+
+// Методы для работы с шифрованными логами
+void PacketHandler::setLogEncryptionEnabled(bool enabled, const QString& password) {
+    encryptLogFile = enabled;
+    if (enabled && !password.isEmpty()) {
+        encryptionKey = LogEncryption::generateKey(password);
+    } else {
+        encryptionKey.clear();
+    }
+    
+    // Очищаем накопленные данные при изменении настроек шифрования
+    if (enabled) {
+        encryptedLogData.clear();
+    }
+}
+
+bool PacketHandler::saveEncryptedLog(const QString& fileName, const QString& password) {
+    if (encryptedLogData.isEmpty()) {
+        qDebug() << "Нет данных для сохранения в зашифрованный лог";
+        return false;
+    }
+    
+    QByteArray key = LogEncryption::generateKey(password);
+    QByteArray encryptedData = LogEncryption::encrypt(encryptedLogData, key);
+    
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qDebug() << "Не удалось открыть файл для записи:" << fileName;
+        return false;
+    }
+    
+    file.write(encryptedData);
+    file.close();
+    
+    qDebug() << "Зашифрованный лог сохранен в файл:" << fileName;
+    return true;
+}
+
+bool PacketHandler::loadEncryptedLog(const QString& fileName, const QString& password) {
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "Не удалось открыть файл для чтения:" << fileName;
+        return false;
+    }
+    
+    QByteArray encryptedData = file.readAll();
+    file.close();
+    
+    QByteArray key = LogEncryption::generateKey(password);
+    QByteArray decryptedData = LogEncryption::decrypt(encryptedData, key);
+    
+    if (decryptedData.isEmpty()) {
+        qDebug() << "Не удалось расшифровать данные логов, возможно неверный пароль";
+        return false;
+    }
+    
+    encryptedLogData = decryptedData;
+    qDebug() << "Зашифрованный лог успешно загружен из файла:" << fileName;
+    
+    // Отображаем расшифрованные данные в консоли (для отладки)
+    QString logContent = QString::fromUtf8(decryptedData);
+    qDebug() << "Содержимое лога (первые 200 символов):";
+    qDebug() << logContent.left(200) << "...";
+    
+    return true;
 }
