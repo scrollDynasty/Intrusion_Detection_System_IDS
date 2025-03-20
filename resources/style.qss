@@ -1,0 +1,229 @@
+/* Современный стиль для IDS */
+
+/* Основной стиль приложения */
+QMainWindow {
+    background-color: #2D3250;
+    color: #F1F6F9;
+}
+
+/* Стиль для меню и статусной строки */
+QMenuBar, QStatusBar {
+    background-color: #1A1A2E;
+    color: #F1F6F9;
+    border: none;
+}
+
+QMenuBar::item {
+    background-color: transparent;
+    padding: 8px 12px;
+}
+
+QMenuBar::item:selected {
+    background-color: #4D4C7D;
+    border-radius: 4px;
+}
+
+QStatusBar {
+    padding: 4px;
+    font-weight: bold;
+}
+
+/* Стиль для кнопок */
+QPushButton {
+    background-color: #4D4C7D;
+    color: #F1F6F9;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-weight: bold;
+    min-width: 100px;
+}
+
+QPushButton:hover {
+    background-color: #5C5B95;
+}
+
+QPushButton:pressed {
+    background-color: #363062;
+}
+
+QPushButton:disabled {
+    background-color: #2D2D44;
+    color: #A0A0A0;
+}
+
+/* Стиль для выпадающего списка */
+QComboBox {
+    background-color: #363062;
+    color: #F1F6F9;
+    border: 1px solid #4D4C7D;
+    border-radius: 4px;
+    padding: 6px 12px;
+    min-width: 200px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+QComboBox::down-arrow {
+    image: url(resources/down-arrow.png);
+    width: 12px;
+    height: 12px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #363062;
+    color: #F1F6F9;
+    selection-background-color: #4D4C7D;
+    selection-color: #F1F6F9;
+    border: 1px solid #4D4C7D;
+}
+
+/* Стиль для таблицы */
+QTableView {
+    background-color: #1A1A2E;
+    color: #F1F6F9;
+    border: 1px solid #4D4C7D;
+    border-radius: 4px;
+    gridline-color: #363062;
+    selection-background-color: #4D4C7D;
+    selection-color: #F1F6F9;
+}
+
+QTableView::item {
+    padding: 6px;
+}
+
+QTableView::item:selected {
+    background-color: #4D4C7D;
+}
+
+QHeaderView::section {
+    background-color: #363062;
+    color: #F1F6F9;
+    padding: 8px;
+    border: none;
+    font-weight: bold;
+}
+
+/* Стиль для текстового поля */
+QTextEdit {
+    background-color: #1A1A2E;
+    color: #F1F6F9;
+    border: 1px solid #4D4C7D;
+    border-radius: 4px;
+    padding: 6px;
+    font-family: "Consolas", monospace;
+}
+
+/* Стиль для полосы прокрутки */
+QScrollBar:vertical {
+    background-color: #1A1A2E;
+    width: 12px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #4D4C7D;
+    min-height: 30px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #5C5B95;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    background-color: #1A1A2E;
+    height: 12px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #4D4C7D;
+    min-width: 30px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #5C5B95;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* Стиль для группы */
+QGroupBox {
+    border: 1px solid #4D4C7D;
+    border-radius: 4px;
+    margin-top: 20px;
+    padding-top: 24px;
+    color: #F1F6F9;
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 10px;
+    color: #F1F6F9;
+}
+
+/* Стиль для метки */
+QLabel {
+    color: #F1F6F9;
+}
+
+/* Стиль для вкладок */
+QTabWidget::pane {
+    border: 1px solid #4D4C7D;
+    border-radius: 4px;
+    background-color: #1A1A2E;
+}
+
+QTabBar::tab {
+    background-color: #2D3250;
+    color: #F1F6F9;
+    padding: 8px 16px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #4D4C7D;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #363062;
+}
+
+/* Стиль для предупреждений и ошибок */
+.warning {
+    color: #FFD700;
+}
+
+.error {
+    color: #FF6B6B;
+}
+
+.success {
+    color: #4CAF50;
+}
+
+/* Стиль для подозрительных IP */
+.suspicious {
+    background-color: rgba(255, 107, 107, 0.3);
+}
+
+.critical {
+    background-color: rgba(255, 0, 0, 0.5);
+    font-weight: bold;
+} 

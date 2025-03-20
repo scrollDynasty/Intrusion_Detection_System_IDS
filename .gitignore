@@ -1,0 +1,207 @@
+# Директории сборки
+build/
+cmake-build/
+cmake-build-debug/
+cmake-build-release/
+
+# Файлы Qt
+*.pro.user
+*.pro.user.*
+*.qmake.stash
+*.moc
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+Makefile*
+*build-*
+*.qm
+.qmake.cache
+.qmake.stash
+
+# Файлы CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# Скомпилированные файлы C++
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.la
+*.lo
+*.slo
+*.lai
+
+# Файлы IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+*.vcxproj.user
+*.vcproj.*.user
+*.ncb
+*.sln.docstates
+*.idb
+*.pdb
+
+# Файлы отладки
+*.pdb
+*.ilk
+*.exp
+*.map
+
+# Файлы системы
+.DS_Store
+.directory
+.Trash-*
+$RECYCLE.BIN/
+Desktop.ini
+Thumbs.db
+ehthumbs.db
+
+# Временные файлы
+*.tmp
+*.temp
+*.bak
+*.swp
+*.log
+*.cache
+
+# Файлы Docker
+.docker/
+docker-compose.override.yml
+
+# Файлы зависимостей
+/vendor/
+/node_modules/
+/packages/
+
+# Файлы конфигурации
+*.env
+*.env.*
+config.local.php
+*.local.conf
+
+# Файлы документации
+/docs/_build/
+/docs/_static/
+/docs/_templates/
+
+# Файлы тестов
+/tests/coverage/
+*.gcno
+*.gcda
+*.gcov
+
+# Специфичные для проекта IDS
+/pcap_files/
+/logs/
+*.pcap
+*.cap
+*.dump
+
+# Файлы безопасности
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+*.pub
+
+# Архивы
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+*.gz
+
+# Бинарные файлы Qt
+/bin/
+*.dll.a
+*.dll.debug
+moc_predefs.h
+
+# Файлы MinGW
+*.Debug
+*.Release
+
+# Файлы CLion
+.idea/
+cmake-build-*/
+*.iml
+modules.xml
+.idea/misc.xml
+*.ipr
+
+# Файлы Visual Studio
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Файлы профилирования
+*.gcda
+*.gcno
+*.prof
+
+# Файлы покрытия кода
+*.gcov
+*.lcov
+coverage.info
+coverage/
+
+# Специфичные для Windows
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Специфичные для macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk 

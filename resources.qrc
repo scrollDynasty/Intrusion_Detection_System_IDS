@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>resources/style.qss</file>
+        <file>resources/down-arrow.svg</file>
+        <file>sounds/alert.wav</file>
+    </qresource>
+</RCC> 
