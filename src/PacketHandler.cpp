@@ -107,10 +107,16 @@ struct BruteForceTracker {
 static PacketFrequencyTracker dosTracker;
 static BruteForceTracker bruteForceTracker;
 
+// Инициализация статического указателя
+PacketHandler* PacketHandler::currentInstance = nullptr;
+
 PacketHandler::PacketHandler(QObject *parent)
     : QObject(parent), handle(nullptr), isRunning(false), packetCount(0) {
     // Получаем локальные IP-адреса при инициализации
     localIPAddresses = getLocalIPAddresses();
+    
+    // Устанавливаем текущий экземпляр
+    currentInstance = this;
     
     // Выводим все найденные локальные IP адреса
     qDebug() << "Локальные IP-адреса:";
@@ -121,6 +127,9 @@ PacketHandler::PacketHandler(QObject *parent)
 
 PacketHandler::~PacketHandler() {
     stopCapture();
+    if (currentInstance == this) {
+        currentInstance = nullptr;
+    }
 }
 
 void PacketHandler::logEvent(const std::string& message) {
@@ -129,7 +138,12 @@ void PacketHandler::logEvent(const std::string& message) {
 
 void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pkthdr, const u_char *packet) {
     try {
-        PacketHandler *handler = reinterpret_cast<PacketHandler*>(userData);
+        // Используем статический указатель для доступа к текущему экземпляру
+        PacketHandler *handler = currentInstance;
+        if (!handler) {
+            qDebug() << "Ошибка: нет активного экземпляра PacketHandler";
+            return;
+        }
         
         // Отладочный вывод
         qDebug() << "Получен пакет размером" << pkthdr->len << "байт";
@@ -450,7 +464,7 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
             }
         }
         
-        // Увеличиваем счетчик пакетов
+        // Увеличиваем счетчик пакетов через текущий экземпляр
         handler->incrementPacketCount();
         
         // Отправляем сигнал с информацией о пакете
@@ -458,10 +472,7 @@ void PacketHandler::processPacket(u_char *userData, const struct pcap_pkthdr *pk
         emit handler->packetDetected(QString(sourceIP), QString(destIP), packetType + details, timestamp, isPotentialThreat);
     }
     catch (const std::exception& e) {
-        qCritical() << "Исключение в processPacket:" << e.what();
-    }
-    catch (...) {
-        qCritical() << "Неизвестное исключение в processPacket";
+        qDebug() << "Ошибка при обработке пакета:" << e.what();
     }
 }
 
@@ -748,5 +759,34 @@ void PacketHandler::stopCapture() {
     }
     catch (...) {
         qCritical() << "Неизвестное исключение в stopCapture";
+    }
+}
+
+std::vector<std::string> PacketHandler::getAvailableInterfaces() {
+    std::vector<std::string> interfaces;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    
+    pcap_if_t *alldevs;
+    if (pcap_findalldevs(&alldevs, errbuf) == -1) {
+        qDebug() << "Ошибка при поиске устройств:" << errbuf;
+        return interfaces;
+    }
+    
+    for (pcap_if_t *d = alldevs; d; d = d->next) {
+        // Добавляем все интерфейсы, кроме loopback
+        if (strcmp(d->name, "lo") != 0) {
+            interfaces.push_back(d->name);
+            qDebug() << "Найден интерфейс:" << d->name << (d->description ? d->description : "");
+        }
+    }
+    
+    pcap_freealldevs(alldevs);
+    return interfaces;
+}
+
+void PacketHandler::incrementPacketCount() {
+    packetCount++;
+    if (packetCount % 100 == 0) {
+        qDebug() << "Обработано пакетов:" << packetCount;
     }
 }

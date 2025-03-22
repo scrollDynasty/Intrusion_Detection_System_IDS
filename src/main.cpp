@@ -12,9 +12,10 @@
 #include <unistd.h>
 #endif
 
-#include <QApplication>
-#include <QMessageBox>
-#include <QStyleFactory>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <QCoreApplication>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
 #include <QFile>
@@ -22,10 +23,10 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QMutex>
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-#include <QTextCodec>
-#endif
-#include "MainWindow.h"
+#include <termios.h>
+#include <openssl/evp.h>
+#include <openssl/aes.h>
+#include <openssl/rand.h>
 #include "PacketHandler.h"
 
 #ifdef _WIN32
@@ -35,151 +36,218 @@
 // Глобальный мьютекс для синхронизации доступа к файлу лога
 QMutex logMutex;
 
-// Функция для загрузки и применения стилей
-void applyStyles(QApplication& app) {
-    QFile styleFile(":/resources/style.qss");
-    if (styleFile.open(QFile::ReadOnly | QFile::Text)) {
-        QTextStream stream(&styleFile);
-        app.setStyleSheet(stream.readAll());
-        styleFile.close();
-    } else {
-        qWarning("Не удалось загрузить файл стилей");
-    }
+// Глобальная переменная для хранения пароля шифрования
+QString g_encryptionPassword;
+
+// Функция для чтения пароля без отображения символов
+std::string readPassword() {
+    struct termios oldt, newt;
+    std::string password;
+    
+    // Сохраняем текущие настройки терминала
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ECHO | ICANON);
+    
+    // Устанавливаем новые настройки
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    
+    // Читаем пароль
+    std::getline(std::cin, password);
+    
+    // Восстанавливаем старые настройки
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    
+    return password;
 }
 
-// Обработчик сообщений для перенаправления вывода в файл лога
+// Обработчик сообщений для перенаправления вывода в зашифрованный файл лога
 void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-    // Блокируем мьютекс для безопасного доступа к файлу
     QMutexLocker locker(&logMutex);
     
-    // Открываем файл для каждого сообщения
-    QFile logFile("ids_log.txt");
-    if (!logFile.open(QIODevice::Append | QIODevice::Text)) {
-        // Если не удалось открыть файл, выводим сообщение в стандартный вывод
-        fprintf(stderr, "Не удалось открыть файл лога\n");
-        return;
-    }
-    
-    QTextStream out(&logFile);
-    // В Qt6 нет setCodec, но QTextStream по умолчанию использует UTF-8
-    
-    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
+    QDateTime now = QDateTime::currentDateTime();
+    QString timestamp = now.toString("yyyy-MM-dd hh:mm:ss.zzz");
+    QString logMessage;
     
     switch (type) {
         case QtDebugMsg:
-            out << timestamp << " [DEBUG] " << msg << "\n";
+            logMessage = timestamp + " [DEBUG] " + msg + "\n";
             break;
         case QtInfoMsg:
-            out << timestamp << " [INFO] " << msg << "\n";
+            logMessage = timestamp + " [INFO] " + msg + "\n";
             break;
         case QtWarningMsg:
-            out << timestamp << " [WARNING] " << msg << "\n";
+            logMessage = timestamp + " [WARNING] " + msg + "\n";
             break;
         case QtCriticalMsg:
-            out << timestamp << " [CRITICAL] " << msg << "\n";
+            logMessage = timestamp + " [CRITICAL] " + msg + "\n";
             break;
         case QtFatalMsg:
-            out << timestamp << " [FATAL] " << msg << "\n";
-            // Не вызываем abort() здесь, чтобы не завершать программу аварийно
+            logMessage = timestamp + " [FATAL] " + msg + "\n";
             break;
     }
     
-    // Сбрасываем буфер и закрываем файл
-    out.flush();
-    logFile.close();
+    // Шифруем сообщение
+    QByteArray data = logMessage.toUtf8();
+    QByteArray encrypted;
+    encrypted.resize(data.size() + 16); // Размер блока AES
     
-    // Дублируем вывод в консоль с правильной кодировкой
-    #ifdef _WIN32
-    static FILE* consoleOut = nullptr;
-    if (!consoleOut) {
-        // Открываем консоль в режиме UTF-8 только один раз
-        consoleOut = _fdopen(_dup(fileno(stderr)), "w");
-        if (consoleOut) {
-            // Устанавливаем UTF-8 для потока вывода
-            _setmode(_fileno(consoleOut), _O_U8TEXT);
+    // Используем тот же метод шифрования, что и в GUI
+    unsigned char key[32];
+    unsigned char iv[16];
+    EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha256(), nullptr,
+                   (unsigned char*)g_encryptionPassword.toUtf8().constData(),
+                   g_encryptionPassword.length(), 1, key, iv);
+    
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (ctx) {
+        EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key, iv);
+        
+        int len1, len2;
+        EVP_EncryptUpdate(ctx, (unsigned char*)encrypted.data(), &len1,
+                         (unsigned char*)data.constData(), data.size());
+        EVP_EncryptFinal_ex(ctx, (unsigned char*)encrypted.data() + len1, &len2);
+        
+        encrypted.resize(len1 + len2);
+        EVP_CIPHER_CTX_free(ctx);
+        
+        // Сохраняем в файл
+        QFile logFile("ids_log.enc");
+        if (logFile.open(QIODevice::Append)) {
+            logFile.write(encrypted);
+            logFile.close();
         }
     }
     
-    if (consoleOut) {
-        // Используем широкие символы для вывода в консоль
-        fwprintf(consoleOut, L"%ls\n", msg.toStdWString().c_str());
-        fflush(consoleOut);
-    } else {
-        // Резервный вариант, если не удалось настроить UTF-8
-        fprintf(stderr, "%s\n", qPrintable(msg));
+    // Выводим сообщение в консоль
+    std::cout << qPrintable(msg) << std::endl;
+}
+
+// Функция для вывода списка доступных сетевых интерфейсов
+void printAvailableInterfaces() {
+    PacketHandler handler;
+    std::vector<std::string> interfaces = handler.getAvailableInterfaces();
+    
+    std::cout << "\nДоступные сетевые интерфейсы:\n";
+    for (size_t i = 0; i < interfaces.size(); ++i) {
+        std::cout << i + 1 << ". " << interfaces[i] << "\n";
     }
-    #else
-    // Для Linux и других систем просто используем стандартный вывод
-    fprintf(stderr, "%s\n", qPrintable(msg));
-    #endif
 }
 
 int main(int argc, char *argv[]) {
-    // Обязательно включаем поддержку UTF-8 в приложении
-    #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
-    #endif
+    QCoreApplication app(argc, argv);
     
-    // Устанавливаем обработчик сообщений для перенаправления вывода в файл
+    // Запрашиваем пароль в начале
+    std::cout << "Введите пароль для шифрования логов: ";
+    g_encryptionPassword = QString::fromStdString(readPassword());
+    
+    // Устанавливаем обработчик сообщений
     qInstallMessageHandler(messageHandler);
-    
-    // Инициализируем кодировку для консоли (только для Windows)
-    #ifdef _WIN32
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-    
-    // Устанавливаем режим UTF-8 для стандартных потоков
-    _setmode(_fileno(stdout), _O_U8TEXT);
-    _setmode(_fileno(stderr), _O_U8TEXT);
-    #endif
-
-    QApplication app(argc, argv);
-    
-    // Применяем стили
-    applyStyles(app);
     
     // Настраиваем парсер командной строки
     QCommandLineParser parser;
-    parser.setApplicationDescription("Intrusion Detection System");
+    parser.setApplicationDescription("Intrusion Detection System (Консольная версия)");
     parser.addHelpOption();
     
-    // Добавляем опцию для указания сетевого адаптера
     QCommandLineOption adapterOption(QStringList() << "a" << "adapter",
-                                    "Specify network adapter name",
+                                    "Указать сетевой интерфейс",
                                     "adapter");
     parser.addOption(adapterOption);
     
-    // Парсим аргументы командной строки
     parser.process(app);
     
-    // Проверяем, указан ли адаптер в командной строке
-    QString adapterName;
-    if (parser.isSet(adapterOption)) {
-        adapterName = parser.value(adapterOption);
-    }
+    // Выводим главное меню
+    static bool isMonitoring = false;
+    static PacketHandler* packetHandler = nullptr;
     
-    // Устанавливаем стиль приложения (базовый стиль)
-    app.setStyle(QStyleFactory::create("Fusion"));
-    
-    // Создаем и показываем главное окно
-    MainWindow mainWindow;
-    
-    // Если указан адаптер в командной строке, запускаем захват пакетов
-    if (!adapterName.isEmpty()) {
-        PacketHandler packetHandler;
-        if (packetHandler.startCapture(adapterName.toStdString())) {
-            QMessageBox::information(&mainWindow, "Информация", 
-                                    QString("Захват пакетов запущен на адаптере: %1").arg(adapterName));
-        } else {
-            QMessageBox::critical(&mainWindow, "Ошибка", 
-                                 QString("Не удалось запустить захват пакетов на адаптере: %1").arg(adapterName));
+    while (true) {
+        std::cout << "\n=== Система обнаружения вторжений ===\n";
+        std::cout << "1. Начать мониторинг\n";
+        std::cout << "2. " << (isMonitoring ? "Остановить мониторинг" : "Мониторинг не запущен") << "\n";
+        std::cout << "3. Изменить пароль шифрования\n";
+        std::cout << "4. Выход\n";
+        std::cout << "Выберите действие (1-4): ";
+        
+        int choice;
+        std::cin >> choice;
+        std::cin.ignore();
+        
+        switch (choice) {
+            case 1: {
+                if (isMonitoring) {
+                    std::cout << "Мониторинг уже запущен!\n";
+                    break;
+                }
+                
+                // Показываем доступные интерфейсы
+                PacketHandler tempHandler;
+                std::vector<std::string> interfaces = tempHandler.getAvailableInterfaces();
+                std::cout << "\nДоступные сетевые интерфейсы:\n";
+                for (size_t i = 0; i < interfaces.size(); ++i) {
+                    std::cout << i + 1 << ". " << interfaces[i] << "\n";
+                }
+                
+                // Запрашиваем выбор интерфейса
+                std::cout << "\nВыберите интерфейс (1-" << interfaces.size() << "): ";
+                int interfaceChoice;
+                std::cin >> interfaceChoice;
+                std::cin.ignore();
+                
+                if (interfaceChoice < 1 || interfaceChoice > static_cast<int>(interfaces.size())) {
+                    std::cout << "Неверный выбор интерфейса!\n";
+                    break;
+                }
+                
+                QString adapterName = QString::fromStdString(interfaces[interfaceChoice - 1]);
+                
+                packetHandler = new PacketHandler();
+                QString errorMessage;
+                if (packetHandler->startCapture(adapterName.toStdString(), &errorMessage)) {
+                    std::cout << "Мониторинг запущен на интерфейсе: " << qPrintable(adapterName) << "\n";
+                    isMonitoring = true;
+                } else {
+                    std::cout << "Ошибка запуска мониторинга: " << qPrintable(errorMessage) << "\n";
+                    delete packetHandler;
+                    packetHandler = nullptr;
+                }
+                break;
+            }
+            
+            case 2: {
+                if (!isMonitoring) {
+                    std::cout << "Мониторинг не запущен!\n";
+                    break;
+                }
+                
+                if (packetHandler) {
+                    packetHandler->stopCapture();
+                    delete packetHandler;
+                    packetHandler = nullptr;
+                    isMonitoring = false;
+                    std::cout << "Мониторинг остановлен\n";
+                }
+                break;
+            }
+            
+            case 3: {
+                std::cout << "Введите новый пароль для шифрования: ";
+                g_encryptionPassword = QString::fromStdString(readPassword());
+                std::cout << "Пароль успешно изменен\n";
+                break;
+            }
+            
+            case 4:
+                if (packetHandler) {
+                    packetHandler->stopCapture();
+                    delete packetHandler;
+                }
+                return 0;
+                
+            default:
+                std::cout << "Неверный выбор. Попробуйте снова.\n";
         }
     }
     
-    mainWindow.show();
-    
-    // Запускаем цикл обработки событий
-    return app.exec();
+    return 0;
 }

@@ -41,39 +41,26 @@ if(IS_WINDOWS)
 endif()
 
 # Находим пакеты Qt (для Qt6)
-find_package(Qt6 COMPONENTS Widgets Core REQUIRED)
+find_package(Qt6 COMPONENTS Core REQUIRED)
 
 # Проверяем наличие libpcap на Linux
 if(NOT IS_WINDOWS)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(PCAP REQUIRED libpcap)
+    find_package(OpenSSL REQUIRED)
     message(STATUS "Found libpcap: ${PCAP_LIBRARIES}")
+    message(STATUS "Found OpenSSL: ${OPENSSL_LIBRARIES}")
 endif()
 
 set(SOURCES
     src/main.cpp
     src/PacketHandler.cpp
-    src/DeviceManager.cpp
-    src/MainWindow.cpp
-    src/SuspiciousIPModel.cpp
 )
 
 set(HEADERS
-    include/PacketHandler.h
-    include/DeviceManager.h
-    include/MainWindow.h
-    include/SuspiciousIPModel.h
+    src/PacketHandler.h
     include/ip_hdr.h
     include/tcp_hdr.h
-)
-
-set(UI_FILES
-    src/MainWindow.ui
-)
-
-# Добавляем файл ресурсов
-set(RESOURCES
-    resources.qrc
 )
 
 include_directories(
@@ -89,7 +76,7 @@ else()
 endif()
 
 # Создаем обычный исполняемый файл без запроса прав администратора
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES} ${RESOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 # Линкуем нужные библиотеки в зависимости от платформы
 if(IS_WINDOWS)
@@ -98,12 +85,16 @@ if(IS_WINDOWS)
         wpcap
         ws2_32
         iphlpapi
-        Qt6::Widgets
+        Qt6::Core
+        OpenSSL::SSL
+        OpenSSL::Crypto
     )
 else()
     target_link_libraries(${PROJECT_NAME} PRIVATE
         ${PCAP_LIBRARIES}
-        Qt6::Widgets
+        Qt6::Core
+        OpenSSL::SSL
+        OpenSSL::Crypto
     )
 endif()
 
@@ -113,29 +104,7 @@ if(IS_WINDOWS)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${QT_BIN_DIR}/Qt6Core.dll"
-            "${QT_BIN_DIR}/Qt6Gui.dll"
-            "${QT_BIN_DIR}/Qt6Widgets.dll"
             $<TARGET_FILE_DIR:${PROJECT_NAME}>
-    )
-    
-    # Копируем плагины Qt
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins/platforms"
-    )
-    
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${QT_BIN_DIR}/../plugins/platforms/qwindows.dll"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins/platforms"
-    )
-    
-    # Создаем файл qt.conf
-    file(WRITE ${CMAKE_BINARY_DIR}/qt.conf "[Paths]\nPlugins=./plugins")
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_BINARY_DIR}/qt.conf"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
     )
     
     # Копируем DLL-файлы MinGW (если используется MinGW)
