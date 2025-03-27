@@ -1,0 +1,18 @@
+[Unit]
+Description=Intrusion Detection System SSH Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ids-ssh
+ExecStart=/opt/ids-ssh/Intrusion_Detection_System_IDS_SSH --service --adapter 1
+Restart=on-failure
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=ids-ssh
+
+[Install]
+WantedBy=multi-user.target 

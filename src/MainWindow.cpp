@@ -271,6 +271,20 @@ void MainWindow::onPacketDetected(const QString& sourceIP, const QString& destin
                           .arg(destinationIP)
                           .arg(packetType);
         ui->textEditLog->append(alertMessage);
+        
+        // Принудительно прокручиваем список подозрительных IP вниз, чтобы увидеть новую запись
+        ui->tableViewSuspiciousIP->scrollToBottom();
+        
+        // Выделяем новую запись в таблице для привлечения внимания
+        int row = suspiciousIPModel->rowCount() - 1;
+        if (row >= 0) {
+            QModelIndex index = suspiciousIPModel->index(row, 0);
+            ui->tableViewSuspiciousIP->selectionModel()->select(
+                index, 
+                QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows
+            );
+            ui->tableViewSuspiciousIP->setFocus();
+        }
     } else {
         // Обычные пакеты отображаем нормальным цветом (без выделения)
         logMessage = QString("[%1] %2 → %3: %4")
@@ -309,6 +323,10 @@ void MainWindow::setupModernUI()
     QHeaderView* header = ui->tableViewSuspiciousIP->horizontalHeader();
     header->setHighlightSections(false);
     header->setSectionResizeMode(QHeaderView::Stretch);
+    
+    // Автоматическое изменение размера таблицы при добавлении новых данных
+    ui->tableViewSuspiciousIP->resizeColumnsToContents();
+    ui->tableViewSuspiciousIP->resizeRowsToContents();
     
     // Устанавливаем цвет фона для лога
     QPalette logPalette = ui->textEditLog->palette();
@@ -451,24 +469,38 @@ void MainWindow::generateTestTraffic() {
     int sourcePort = QRandomGenerator::global()->bounded(1024, 65535);
     int destPort = QRandomGenerator::global()->bounded(1, 65535);
     
+    // Увеличиваем шанс генерации подозрительных пакетов для тестирования
+    // Базовый шанс 40% для любого типа пакета
+    bool forceSuspicious = (QRandomGenerator::global()->bounded(0, 100) < 40);
+    
     // Определяем тип пакета и детали
     switch (packetTypeIndex) {
         case 0: { // TCP
             // Генерируем случайный TCP флаг (SYN, ACK, FIN, RST)
             int tcpFlagIndex = QRandomGenerator::global()->bounded(0, 5);
             
+            if (forceSuspicious) {
+                // Если нужен подозрительный пакет, выбираем SYN или RST с большей вероятностью
+                tcpFlagIndex = QRandomGenerator::global()->bounded(0, 2) == 0 ? 0 : 3; // SYN или RST
+                // И выбираем уязвимый порт
+                destPort = QRandomGenerator::global()->bounded(1, 5) == 1 ? 3389 : // RDP
+                          (QRandomGenerator::global()->bounded(1, 5) == 2 ? 22 :   // SSH
+                          (QRandomGenerator::global()->bounded(1, 5) == 3 ? 1433 : // MS SQL
+                          (QRandomGenerator::global()->bounded(1, 5) == 4 ? 3306 : 445))); // MySQL или SMB
+            }
+            
             switch (tcpFlagIndex) {
                 case 0: // SYN
                     packetType = "TCP SYN";
                     
                     // Если порт назначения < 1024, это может быть сканирование портов
-                    if (destPort < 1024) {
+                    if (destPort < 1024 || forceSuspicious) {
                         details = QString(" (Порт %1 → %2) Возможное сканирование портов")
                                  .arg(sourcePort)
                                  .arg(destPort);
                         
-                        // С вероятностью 70% помечаем как потенциальную угрозу
-                        isPotentialThreat = (QRandomGenerator::global()->bounded(0, 100) < 70);
+                        // Повышаем шанс подозрительного пакета
+                        isPotentialThreat = (QRandomGenerator::global()->bounded(0, 100) < 70) || forceSuspicious;
                     } else {
                         details = QString(" (Порт %1 → %2)")
                                  .arg(sourcePort)
@@ -508,8 +540,11 @@ void MainWindow::generateTestTraffic() {
                              .arg(sourcePort)
                              .arg(destPort);
                     
-                    // С вероятностью 30% помечаем как потенциальную угрозу
-                    isPotentialThreat = (QRandomGenerator::global()->bounded(0, 100) < 30);
+                    // Повышаем шанс подозрительного пакета
+                    isPotentialThreat = (QRandomGenerator::global()->bounded(0, 100) < 50) || forceSuspicious;
+                    if (isPotentialThreat) {
+                        details += " (Возможный сброс соединения)";
+                    }
                     break;
                     
                 case 4: // ACK
@@ -528,16 +563,23 @@ void MainWindow::generateTestTraffic() {
                      .arg(sourcePort)
                      .arg(destPort);
             
+            if (forceSuspicious) {
+                // Если нужен подозрительный пакет, выбираем уязвимый порт
+                destPort = QRandomGenerator::global()->bounded(1, 4) == 1 ? 53 :  // DNS
+                          (QRandomGenerator::global()->bounded(1, 4) == 2 ? 161 : // SNMP
+                          (QRandomGenerator::global()->bounded(1, 4) == 3 ? 1900 : 5353)); // UPnP или mDNS
+            }
+            
             // Проверка на известные уязвимые UDP порты
             if (destPort == 53 || // DNS
                 destPort == 161 || destPort == 162 || // SNMP
                 destPort == 1900 || // UPnP
                 destPort == 5353) { // mDNS
                 
-                // С вероятностью 20% помечаем как потенциальную угрозу (UDP флуд)
-                if (QRandomGenerator::global()->bounded(0, 100) < 20) {
+                // Повышаем шанс подозрительного пакета
+                isPotentialThreat = (QRandomGenerator::global()->bounded(0, 100) < 60) || forceSuspicious;
+                if (isPotentialThreat) {
                     details += " (Возможный UDP флуд)";
-                    isPotentialThreat = true;
                 }
             }
             break;
@@ -547,10 +589,10 @@ void MainWindow::generateTestTraffic() {
             packetType = "ICMP";
             details = " (ping)";
             
-            // С вероятностью 10% помечаем как потенциальную угрозу (ping flood)
-            if (QRandomGenerator::global()->bounded(0, 100) < 10) {
+            // Повышаем шанс подозрительного пакета
+            isPotentialThreat = (QRandomGenerator::global()->bounded(0, 100) < 40) || forceSuspicious;
+            if (isPotentialThreat) {
                 details += " (Возможный ping flood)";
-                isPotentialThreat = true;
             }
             break;
         }
@@ -574,8 +616,17 @@ void MainWindow::addSuspiciousIP(const QString& sourceIP, const QString& destina
     
     // Обновляем счетчик подозрительных пакетов
     suspiciousPacketsCount++;
+    
+    // Обновляем таблицу - гарантируем, что новая запись будет видна
+    ui->tableViewSuspiciousIP->resizeColumnsToContents();
+    ui->tableViewSuspiciousIP->resizeRowsToContents();
+    ui->tableViewSuspiciousIP->scrollToBottom(); // Прокручиваем к новой записи
+    
     // Обновляем информацию в статусной строке
     updateStatusBar();
+    
+    // Выводим информационное сообщение в статусной строке
+    ui->statusBar->showMessage(QString("Обнаружен подозрительный IP: %1 -> %2 (%3)").arg(sourceIP).arg(destinationIP).arg(packetType), 5000);
 }
 
 // Методы для работы с шифрованием логов

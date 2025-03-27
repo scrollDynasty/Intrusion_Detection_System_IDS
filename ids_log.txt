@@ -1,0 +1,26 @@
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::SystemPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::ToolButtonPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::ButtonPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::CheckBoxPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::RadioButtonPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::HeaderPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::ItemViewPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::MessageBoxLabelPelette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::TabBarPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::LabelPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::GroupBoxPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::MenuPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::MenuBarPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::TextEditPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::TextEditPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::TextLineEditPalette
+2025-03-27 11:35:15.391 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::ToolTipPalette
+2025-03-27 11:35:15.392 [DEBUG] virtual QVariant Qt6CTPlatformTheme::themeHint(QPlatformTheme::ThemeHint) const
+2025-03-27 11:35:15.392 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::SystemPalette
+2025-03-27 11:35:15.392 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::SystemPalette
+2025-03-27 11:35:15.392 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::SystemPalette
+2025-03-27 11:35:15.393 [DEBUG] Найден локальный IP-адрес: 192.168.100.43
+2025-03-27 11:35:15.393 [DEBUG] Локальные IP-адреса:
+2025-03-27 11:35:15.393 [DEBUG] "192.168.100.43"
+2025-03-27 11:35:15.393 [DEBUG] "127.0.0.1"
+2025-03-27 11:35:15.436 [DEBUG] virtual const QPalette* Qt6CTPlatformTheme::palette(QPlatformTheme::Palette) const QPlatformTheme::SystemPalette
